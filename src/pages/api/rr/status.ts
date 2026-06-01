@@ -26,7 +26,10 @@ const BITRIX_WEBHOOK_URL = process.env.BITRIX_WEBHOOK_URL?.replace(/\/$/, "");
 const CIF_FIELD = (process.env.BITRIX_COMPANY_CIF_FIELD || "")
     .trim()
     .toUpperCase();
-const REGISTROS_FOLDER_ID = process.env.RR_BITRIX_REGISTROS_FOLDER_ID || "";
+const REGISTROS_FOLDER_ID =
+    process.env.RR_BITRIX_DRIVE_FOLDER_ID ||
+    process.env.RR_BITRIX_REGISTROS_FOLDER_ID ||
+    "";
 const DEFAULT_YEAR = Number(process.env.RR_DEFAULT_YEAR || "2025");
 
 export const GET: APIRoute = async ({ request }) => {
