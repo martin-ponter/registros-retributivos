@@ -10,6 +10,8 @@ import { initBitrixApp, type CurrentBitrixUser } from "../lib/bitrix";
 
 type LoadState = "idle" | "loading" | "success" | "error";
 
+const FIXED_YEAR = 2025;
+
 export default function RrApp() {
     const [insideBitrix, setInsideBitrix] = useState<boolean | null>(null);
     const [currentUser, setCurrentUser] = useState<CurrentBitrixUser | null>(
@@ -17,8 +19,6 @@ export default function RrApp() {
     );
 
     const [query, setQuery] = useState("");
-    const [year, setYear] = useState(2025);
-
     const [companies, setCompanies] = useState<CompanySearchResult[]>([]);
     const [selectedCompany, setSelectedCompany] =
         useState<CompanySearchResult | null>(null);
@@ -29,6 +29,8 @@ export default function RrApp() {
     const [actionState, setActionState] = useState<LoadState>("idle");
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+    const year = FIXED_YEAR;
+    const isGenerating = actionState === "loading";
     const canSearch = query.trim().length >= 2;
 
     const canGenerateReport = Boolean(
@@ -37,7 +39,7 @@ export default function RrApp() {
         status.excelBiloop?.bitrixFileId &&
         status.bitrixCompanyFolderId &&
         !status?.iaReport?.exists &&
-        actionState !== "loading",
+        !isGenerating,
     );
 
     const headerUserLabel = useMemo(() => {
@@ -100,7 +102,7 @@ export default function RrApp() {
                         : "Error buscando empresas.",
                 );
             }
-        }, 350);
+        }, 300);
 
         return () => {
             cancelled = true;
@@ -134,6 +136,8 @@ export default function RrApp() {
     }
 
     async function handleSelectCompany(company: CompanySearchResult) {
+        if (isGenerating) return;
+
         setSelectedCompany(company);
         setStatus(null);
         setErrorMessage(null);
@@ -159,6 +163,7 @@ export default function RrApp() {
     }
 
     async function handleGenerateIaReport() {
+        if (isGenerating) return;
         if (!selectedCompany || !status) return;
 
         const bitrixExcelFileId = status.excelBiloop?.bitrixFileId;
@@ -236,319 +241,341 @@ export default function RrApp() {
     const statusMessage = status?.message || null;
 
     return (
-        <main className="min-h-screen bg-gray-100 p-4 md:p-6">
-            <section className="mx-auto max-w-6xl space-y-5">
-                <header className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
-                            <p className="text-sm font-medium text-gray-500">
+        <main className="h-[100dvh] overflow-hidden bg-gray-100 p-2 md:p-3">
+            <section className="mx-auto flex h-full max-w-7xl flex-col gap-2 md:gap-3">
+                <header className="shrink-0 rounded-2xl border border-gray-200 bg-white px-4 py-3 shadow-sm md:px-5">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="text-xs font-medium text-gray-500">
                                 Ponter · Laboral
                             </p>
 
-                            <h1 className="mt-1 text-2xl font-bold text-gray-950">
+                            <h1 className="truncate text-xl font-bold text-gray-950 md:text-2xl">
                                 Registros Retributivos
                             </h1>
 
-                            <p className="mt-2 max-w-3xl text-sm text-gray-600">
+                            <p className="mt-1 hidden max-w-3xl text-xs text-gray-600 md:block">
                                 Busca una empresa por nombre o CIF, comprueba si
-                                existe su Excel de Biloop en Bitrix Drive y
-                                genera el informe IA.
+                                existe su Excel de Biloop y genera el informe
+                                IA.
                             </p>
                         </div>
 
-                        <div className="rounded-xl bg-gray-50 px-4 py-3 text-sm text-gray-700">
+                        <div className="max-w-[45%] truncate rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-700 md:max-w-none md:text-sm">
                             {headerUserLabel}
                         </div>
                     </div>
                 </header>
 
                 {errorMessage && (
-                    <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    <div className="shrink-0 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-xs text-red-800 md:text-sm">
                         {errorMessage}
                     </div>
                 )}
 
-                <section className="grid gap-5 lg:grid-cols-[420px_1fr]">
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <h2 className="text-lg font-semibold text-gray-950">
-                            Buscar empresa
-                        </h2>
+                <section className="grid min-h-0 flex-1 grid-rows-[minmax(210px,0.42fr)_minmax(0,1fr)] gap-2 md:gap-3 lg:grid-cols-[380px_minmax(0,1fr)] lg:grid-rows-1">
+                    <aside className="flex min-h-0 flex-col rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="shrink-0">
+                            <div className="flex items-center justify-between gap-3">
+                                <h2 className="text-base font-semibold text-gray-950">
+                                    Buscar empresa
+                                </h2>
 
-                        <div className="mt-4 space-y-3">
-                            <label className="block">
-                                <span className="text-sm font-medium text-gray-700">
-                                    Nombre o CIF
+                                <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-semibold text-gray-700">
+                                    Año {year}
                                 </span>
+                            </div>
 
-                                <input
-                                    value={query}
-                                    onChange={(event) => {
-                                        setQuery(event.target.value);
-                                        setSelectedCompany(null);
-                                        setStatus(null);
-                                        setStatusState("idle");
-                                        setActionState("idle");
-                                    }}
-                                    onKeyDown={(event) => {
-                                        if (event.key === "Enter") {
-                                            void handleSearch();
-                                        }
-                                    }}
-                                    placeholder="Ej: 60392288S o ZORRILLA"
-                                    className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none ring-0 transition focus:border-gray-900"
-                                />
-                            </label>
+                            <div className="mt-3 space-y-3">
+                                <label className="block">
+                                    <span className="text-xs font-medium text-gray-700">
+                                        Nombre o CIF
+                                    </span>
 
-                            <label className="block">
-                                <span className="text-sm font-medium text-gray-700">
-                                    Año
-                                </span>
+                                    <input
+                                        value={query}
+                                        onChange={(event) => {
+                                            setQuery(event.target.value);
+                                            setSelectedCompany(null);
+                                            setStatus(null);
+                                            setStatusState("idle");
+                                            setActionState("idle");
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter") {
+                                                void handleSearch();
+                                            }
+                                        }}
+                                        placeholder="Ej: 60392288S o ZORRILLA"
+                                        className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none ring-0 transition focus:border-gray-900"
+                                    />
+                                </label>
 
-                                <select
-                                    value={year}
-                                    onChange={(event) => {
-                                        setYear(Number(event.target.value));
-                                        setSelectedCompany(null);
-                                        setStatus(null);
-                                        setStatusState("idle");
-                                        setActionState("idle");
-                                    }}
-                                    className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-gray-900"
+                                <button
+                                    type="button"
+                                    onClick={() => void handleSearch()}
+                                    disabled={
+                                        !canSearch || searchState === "loading"
+                                    }
+                                    className="w-full rounded-xl bg-gray-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
                                 >
-                                    <option value={2025}>2025</option>
-                                    <option value={2026}>2026</option>
-                                </select>
-                            </label>
-
-                            <button
-                                type="button"
-                                onClick={() => void handleSearch()}
-                                disabled={
-                                    !canSearch || searchState === "loading"
-                                }
-                                className="w-full rounded-xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
-                            >
-                                {searchState === "loading"
-                                    ? "Buscando..."
-                                    : "Buscar ahora"}
-                            </button>
+                                    {searchState === "loading"
+                                        ? "Buscando..."
+                                        : "Buscar ahora"}
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="mt-5 space-y-2">
-                            {query.trim().length < 2 && (
-                                <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-                                    Escribe al menos 2 caracteres para buscar
-                                    por nombre o CIF.
-                                </p>
+                        <div className="mt-3 min-h-0 flex-1 overflow-y-auto pr-1">
+                            <div className="space-y-2">
+                                {query.trim().length < 2 && (
+                                    <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+                                        Escribe al menos 2 caracteres para
+                                        buscar por nombre o CIF.
+                                    </p>
+                                )}
+
+                                {query.trim().length >= 2 &&
+                                    searchState === "loading" && (
+                                        <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+                                            Buscando coincidencias...
+                                        </p>
+                                    )}
+
+                                {query.trim().length >= 2 &&
+                                    companies.length === 0 &&
+                                    searchState === "success" && (
+                                        <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+                                            No se han encontrado empresas.
+                                        </p>
+                                    )}
+
+                                {companies.map((company) => {
+                                    const selected =
+                                        selectedCompany?.id === company.id;
+
+                                    return (
+                                        <button
+                                            key={company.id}
+                                            type="button"
+                                            disabled={isGenerating}
+                                            onClick={() =>
+                                                void handleSelectCompany(
+                                                    company,
+                                                )
+                                            }
+                                            className={`w-full rounded-xl border p-3 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                                                selected
+                                                    ? "border-gray-950 bg-gray-950 text-white"
+                                                    : "border-gray-200 bg-white hover:bg-gray-50"
+                                            }`}
+                                        >
+                                            <div className="line-clamp-2 text-sm font-semibold">
+                                                {company.title}
+                                            </div>
+
+                                            <div
+                                                className={`mt-1 text-xs ${
+                                                    selected
+                                                        ? "text-gray-300"
+                                                        : "text-gray-500"
+                                                }`}
+                                            >
+                                                {company.cif ||
+                                                    "Sin CIF detectado"}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </aside>
+
+                    <section className="min-h-0 overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                        <div className="flex h-full min-h-0 flex-col">
+                            <div className="shrink-0">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h2 className="text-base font-semibold text-gray-950 md:text-lg">
+                                        Estado del registro
+                                    </h2>
+
+                                    {isGenerating && (
+                                        <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                                            Generando informe...
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            {!selectedCompany && (
+                                <div className="mt-3 flex flex-1 items-center justify-center rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-600">
+                                    Selecciona una empresa para ver si ya tiene
+                                    Excel de Biloop e informe generado.
+                                </div>
                             )}
 
-                            {query.trim().length >= 2 &&
-                                searchState === "loading" && (
-                                    <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-                                        Buscando coincidencias...
-                                    </p>
-                                )}
+                            {selectedCompany && statusState === "loading" && (
+                                <div className="mt-3 flex flex-1 items-center justify-center rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-600">
+                                    Consultando Bitrix Drive...
+                                </div>
+                            )}
 
-                            {query.trim().length >= 2 &&
-                                companies.length === 0 &&
-                                searchState === "success" && (
-                                    <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
-                                        No se han encontrado empresas.
-                                    </p>
-                                )}
-
-                            {companies.map((company) => {
-                                const selected =
-                                    selectedCompany?.id === company.id;
-
-                                return (
-                                    <button
-                                        key={company.id}
-                                        type="button"
-                                        onClick={() =>
-                                            void handleSelectCompany(company)
-                                        }
-                                        className={`w-full rounded-xl border p-4 text-left transition ${
-                                            selected
-                                                ? "border-gray-950 bg-gray-950 text-white"
-                                                : "border-gray-200 bg-white hover:bg-gray-50"
-                                        }`}
-                                    >
-                                        <div className="font-semibold">
-                                            {company.title}
+                            {selectedCompany && status && (
+                                <div className="mt-3 grid min-h-0 flex-1 grid-rows-[auto_auto_minmax(0,1fr)] gap-3">
+                                    <div className="rounded-2xl bg-gray-50 p-3">
+                                        <div className="text-xs text-gray-500">
+                                            Empresa seleccionada
                                         </div>
 
-                                        <div
-                                            className={
-                                                selected
-                                                    ? "text-gray-300"
-                                                    : "text-gray-500"
+                                        <div className="mt-1 line-clamp-1 text-base font-bold text-gray-950 md:text-lg">
+                                            {status.companyName}
+                                        </div>
+
+                                        <div className="text-xs text-gray-600 md:text-sm">
+                                            CIF:{" "}
+                                            {status.cif ||
+                                                selectedCompany.cif ||
+                                                "No informado"}{" "}
+                                            · Año: {status.year}
+                                        </div>
+
+                                        {statusMessage && (
+                                            <p className="mt-2 line-clamp-2 text-xs text-amber-700 md:text-sm">
+                                                {statusMessage}
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="grid gap-2 md:grid-cols-3">
+                                        <StatusCard
+                                            title="Excel Biloop"
+                                            exists={Boolean(
+                                                status.excelBiloop?.exists,
+                                            )}
+                                            url={status.excelBiloop?.url}
+                                            fileName={
+                                                status.excelBiloop?.fileName
                                             }
-                                        >
-                                            {company.cif || "Sin CIF detectado"}
+                                        />
+
+                                        <StatusCard
+                                            title="Informe IA"
+                                            exists={Boolean(
+                                                status.iaReport?.exists,
+                                            )}
+                                            url={status.iaReport?.url}
+                                            fileName={status.iaReport?.fileName}
+                                        />
+
+                                        <StatusCard
+                                            title="Informe final"
+                                            exists={Boolean(
+                                                status.finalReport?.exists,
+                                            )}
+                                            url={status.finalReport?.url}
+                                            fileName={
+                                                status.finalReport?.fileName
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="min-h-0 rounded-2xl border border-gray-200 p-3">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <h3 className="font-semibold text-gray-950">
+                                                Acciones disponibles
+                                            </h3>
+
+                                            <div className="flex flex-wrap gap-2">
+                                                {status.folderUrl && (
+                                                    <a
+                                                        href={status.folderUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
+                                                    >
+                                                        Abrir carpeta
+                                                    </a>
+                                                )}
+
+                                                {status.iaReport?.url && (
+                                                    <a
+                                                        href={
+                                                            status.iaReport.url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
+                                                    >
+                                                        Descargar IA
+                                                    </a>
+                                                )}
+
+                                                {status.finalReport?.url && (
+                                                    <a
+                                                        href={
+                                                            status.finalReport
+                                                                .url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
+                                                    >
+                                                        Descargar final
+                                                    </a>
+                                                )}
+                                            </div>
                                         </div>
-                                    </button>
-                                );
-                            })}
+
+                                        <div className="mt-3">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    void handleGenerateIaReport()
+                                                }
+                                                disabled={
+                                                    !canGenerateReport ||
+                                                    isGenerating
+                                                }
+                                                className="rounded-xl bg-gray-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+                                            >
+                                                {isGenerating
+                                                    ? "Generando informe..."
+                                                    : "Generar informe IA"}
+                                            </button>
+                                        </div>
+
+                                        {!status.excelBiloop?.exists && (
+                                            <p className="mt-2 text-xs text-amber-700 md:text-sm">
+                                                No aparece el Excel de Biloop en
+                                                Drive. Primero habrá que revisar
+                                                la carpeta de la empresa.
+                                            </p>
+                                        )}
+
+                                        {status.excelBiloop?.exists &&
+                                            status.iaReport?.exists && (
+                                                <p className="mt-2 text-xs text-gray-600 md:text-sm">
+                                                    Ya existe informe IA para
+                                                    esta empresa y año.
+                                                </p>
+                                            )}
+
+                                        {status.excelBiloop?.exists &&
+                                            !status.iaReport?.exists &&
+                                            !canGenerateReport &&
+                                            !isGenerating && (
+                                                <p className="mt-2 text-xs text-amber-700 md:text-sm">
+                                                    Existe el Excel, pero falta
+                                                    el ID del archivo o de la
+                                                    carpeta. Revisa la respuesta
+                                                    de /api/rr/status.
+                                                </p>
+                                            )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    </div>
-
-                    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
-                        <h2 className="text-lg font-semibold text-gray-950">
-                            Estado del registro
-                        </h2>
-
-                        {!selectedCompany && (
-                            <div className="mt-4 rounded-2xl bg-gray-50 p-6 text-sm text-gray-600">
-                                Selecciona una empresa para ver si ya tiene
-                                Excel de Biloop e informe generado.
-                            </div>
-                        )}
-
-                        {selectedCompany && statusState === "loading" && (
-                            <div className="mt-4 rounded-2xl bg-gray-50 p-6 text-sm text-gray-600">
-                                Consultando Bitrix Drive...
-                            </div>
-                        )}
-
-                        {selectedCompany && status && (
-                            <div className="mt-4 space-y-4">
-                                <div className="rounded-2xl bg-gray-50 p-4">
-                                    <div className="text-sm text-gray-500">
-                                        Empresa seleccionada
-                                    </div>
-
-                                    <div className="mt-1 text-lg font-bold text-gray-950">
-                                        {status.companyName}
-                                    </div>
-
-                                    <div className="text-sm text-gray-600">
-                                        CIF:{" "}
-                                        {status.cif ||
-                                            selectedCompany.cif ||
-                                            "No informado"}{" "}
-                                        · Año: {status.year}
-                                    </div>
-
-                                    {statusMessage && (
-                                        <p className="mt-3 text-sm text-amber-700">
-                                            {statusMessage}
-                                        </p>
-                                    )}
-                                </div>
-
-                                <div className="grid gap-3 md:grid-cols-3">
-                                    <StatusCard
-                                        title="Excel Biloop"
-                                        exists={Boolean(
-                                            status.excelBiloop?.exists,
-                                        )}
-                                        url={status.excelBiloop?.url}
-                                        fileName={status.excelBiloop?.fileName}
-                                    />
-
-                                    <StatusCard
-                                        title="Informe IA"
-                                        exists={Boolean(
-                                            status.iaReport?.exists,
-                                        )}
-                                        url={status.iaReport?.url}
-                                        fileName={status.iaReport?.fileName}
-                                    />
-
-                                    <StatusCard
-                                        title="Informe final"
-                                        exists={Boolean(
-                                            status.finalReport?.exists,
-                                        )}
-                                        url={status.finalReport?.url}
-                                        fileName={status.finalReport?.fileName}
-                                    />
-                                </div>
-
-                                {status.folderUrl && (
-                                    <a
-                                        href={status.folderUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
-                                    >
-                                        Abrir carpeta en Bitrix Drive
-                                    </a>
-                                )}
-
-                                <div className="rounded-2xl border border-gray-200 p-4">
-                                    <h3 className="font-semibold text-gray-950">
-                                        Acciones disponibles
-                                    </h3>
-
-                                    <div className="mt-3 flex flex-wrap gap-3">
-                                        <button
-                                            type="button"
-                                            onClick={() =>
-                                                void handleGenerateIaReport()
-                                            }
-                                            disabled={!canGenerateReport}
-                                            className="rounded-xl bg-gray-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
-                                        >
-                                            {actionState === "loading"
-                                                ? "Generando informe..."
-                                                : "Generar informe IA"}
-                                        </button>
-
-                                        {status.iaReport?.url && (
-                                            <a
-                                                href={status.iaReport.url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
-                                            >
-                                                Descargar informe IA
-                                            </a>
-                                        )}
-
-                                        {status.finalReport?.url && (
-                                            <a
-                                                href={status.finalReport.url}
-                                                target="_blank"
-                                                rel="noreferrer"
-                                                className="rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-900 transition hover:bg-gray-50"
-                                            >
-                                                Descargar informe final
-                                            </a>
-                                        )}
-                                    </div>
-
-                                    {!status.excelBiloop?.exists && (
-                                        <p className="mt-3 text-sm text-amber-700">
-                                            No aparece el Excel de Biloop en
-                                            Drive. Primero habrá que revisar la
-                                            carpeta de la empresa.
-                                        </p>
-                                    )}
-
-                                    {status.excelBiloop?.exists &&
-                                        status.iaReport?.exists && (
-                                            <p className="mt-3 text-sm text-gray-600">
-                                                Ya existe informe IA para esta
-                                                empresa y año.
-                                            </p>
-                                        )}
-
-                                    {status.excelBiloop?.exists &&
-                                        !status.iaReport?.exists &&
-                                        !canGenerateReport && (
-                                            <p className="mt-3 text-sm text-amber-700">
-                                                Existe el Excel, pero falta el
-                                                ID del archivo o de la carpeta.
-                                                Revisa la respuesta de
-                                                /api/rr/status.
-                                            </p>
-                                        )}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    </section>
                 </section>
             </section>
         </main>
@@ -562,12 +589,14 @@ function StatusCard(props: {
     url?: string | null;
 }) {
     return (
-        <div className="rounded-2xl border border-gray-200 p-4">
-            <div className="flex items-center justify-between gap-3">
-                <h3 className="font-semibold text-gray-950">{props.title}</h3>
+        <div className="min-w-0 rounded-2xl border border-gray-200 p-3">
+            <div className="flex items-center justify-between gap-2">
+                <h3 className="truncate text-sm font-semibold text-gray-950">
+                    {props.title}
+                </h3>
 
                 <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${
                         props.exists
                             ? "bg-green-100 text-green-800"
                             : "bg-gray-100 text-gray-600"
@@ -577,7 +606,7 @@ function StatusCard(props: {
                 </span>
             </div>
 
-            <p className="mt-2 min-h-10 text-sm text-gray-600">
+            <p className="mt-2 line-clamp-2 min-h-8 text-xs text-gray-600">
                 {props.fileName || "No localizado todavía"}
             </p>
 
@@ -586,7 +615,7 @@ function StatusCard(props: {
                     href={props.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-3 inline-flex text-sm font-semibold text-gray-950 underline"
+                    className="mt-2 inline-flex text-xs font-semibold text-gray-950 underline"
                 >
                     Abrir documento
                 </a>
