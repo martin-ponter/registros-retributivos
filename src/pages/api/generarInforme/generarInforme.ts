@@ -19,6 +19,7 @@ type GenerateInformeRequest = {
     bitrixExcelFileId?: string;
     templateBase64?: string;
     templatePath?: string;
+    templateUrl?: string;
     contextText?: string;
     model?: string;
     maxOutputTokens?: number;
@@ -38,18 +39,15 @@ const DEFAULT_MODEL = process.env.OPENAI_REPORT_MODEL || "gpt-5.4-mini";
 const DEFAULT_MAX_OUTPUT_TOKENS = 22000;
 const DEFAULT_TEMPLATE_PATH =
     process.env.RR_TEMPLATE_DOCX_PATH ||
-    path.join(
-        process.cwd(),
-        "biloop-registro-retributivo-playwright - copia",
-        "biloop-registro-retributivo-playwright - copia",
-        "plantilla_informe_ponter_descarga.docx",
-    );
+    path.join(process.cwd(), "plantilla_informe_ponter_descarga.docx");
+const DEFAULT_TEMPLATE_URL = process.env.RR_TEMPLATE_DOCX_URL || "";
 
 export const POST: APIRoute = async ({ request }) => {
     try {
         const payload = await readRequestPayload(request);
         const excel = await resolveExcelFile(payload, request);
-        const templateBuffer = await resolveTemplateBuffer(payload);
+        const templateBuffer = await resolveTemplateBuffer(payload, request);
+
         const data = await generateReportData({
             excel,
             contextText: payload.contextText,
@@ -74,6 +72,7 @@ export const POST: APIRoute = async ({ request }) => {
         const unresolvedTags = findUnresolvedTemplateTags(docxBuffer);
         const bitrixFolderId =
             payload.bitrixFolderId || process.env.RR_BITRIX_DRIVE_FOLDER_ID;
+
         const upload = bitrixFolderId
             ? await uploadToBitrixDrive({
                   folderId: bitrixFolderId,
@@ -119,6 +118,7 @@ async function readRequestPayload(
             excelFileUrl: getFormString(formData, "excelFileUrl"),
             bitrixExcelFileId: getFormString(formData, "bitrixExcelFileId"),
             templatePath: getFormString(formData, "templatePath"),
+            templateUrl: getFormString(formData, "templateUrl"),
             contextText: getFormString(formData, "contextText"),
             model: getFormString(formData, "model"),
             maxOutputTokens: parsePositiveInt(
@@ -163,7 +163,8 @@ async function resolveExcelFile(
     if (payload.excelFileUrl) {
         return fetchRemoteFile({
             url: payload.excelFileUrl,
-            fileName: payload.excelFileName || fileNameFromUrl(payload.excelFileUrl),
+            fileName:
+                payload.excelFileName || fileNameFromUrl(payload.excelFileUrl),
             request,
         });
     }
@@ -187,6 +188,7 @@ async function resolveExcelFile(
 
 async function resolveTemplateBuffer(
     payload: GenerateInformeRequest & { formData?: FormData },
+    request: Request,
 ): Promise<Buffer> {
     const formFile = payload.formData?.get("template");
 
@@ -195,12 +197,54 @@ async function resolveTemplateBuffer(
     }
 
     if (payload.templateBase64) {
-        return Buffer.from(stripDataUrlPrefix(payload.templateBase64), "base64");
+        return Buffer.from(
+            stripDataUrlPrefix(payload.templateBase64),
+            "base64",
+        );
     }
 
-    const templatePath = path.resolve(payload.templatePath || DEFAULT_TEMPLATE_PATH);
+    const templateUrl = payload.templateUrl || DEFAULT_TEMPLATE_URL;
+
+    if (templateUrl) {
+        return fetchTemplateFromUrl(templateUrl, request);
+    }
+
+    const templatePath = path.isAbsolute(
+        payload.templatePath || DEFAULT_TEMPLATE_PATH,
+    )
+        ? payload.templatePath || DEFAULT_TEMPLATE_PATH
+        : path.join(
+              process.cwd(),
+              payload.templatePath || DEFAULT_TEMPLATE_PATH,
+          );
 
     return fs.readFile(templatePath);
+}
+
+async function fetchTemplateFromUrl(
+    templateUrl: string,
+    request: Request,
+): Promise<Buffer> {
+    const url =
+        templateUrl.startsWith("http://") || templateUrl.startsWith("https://")
+            ? templateUrl
+            : new URL(
+                  templateUrl.startsWith("/") ? templateUrl : `/${templateUrl}`,
+                  request.url,
+              ).toString();
+
+    const response = await fetch(url, {
+        method: "GET",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error(
+            `No se ha podido descargar la plantilla DOCX desde ${url}. HTTP ${response.status}`,
+        );
+    }
+
+    return Buffer.from(await response.arrayBuffer());
 }
 
 async function generateReportData(params: {
@@ -522,8 +566,7 @@ function normalizeTemplateTags(zip: PizZip): void {
     const xmlFileNames = Object.keys(zip.files).filter(
         (fileName) =>
             /\.xml$/i.test(fileName) &&
-            (fileName.startsWith("word/") ||
-                fileName.startsWith("docProps/")),
+            (fileName.startsWith("word/") || fileName.startsWith("docProps/")),
     );
 
     for (const fileName of xmlFileNames) {
@@ -555,7 +598,8 @@ function findUnresolvedTemplateTags(docxBuffer: Buffer): string[] {
 
         if (!file) continue;
 
-        const matches = file.asText().match(/\{\{[^}]+\}\}|\{[#/][^}]+\}/g) || [];
+        const matches =
+            file.asText().match(/\{\{[^}]+\}\}|\{[#/][^}]+\}/g) || [];
 
         for (const match of matches) {
             found.add(match);
@@ -572,7 +616,9 @@ function parseModelJson(text: string): unknown {
         return JSON.parse(cleaned);
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`No se pudo parsear el JSON devuelto por OpenAI: ${message}`);
+        throw new Error(
+            `No se pudo parsear el JSON devuelto por OpenAI: ${message}`,
+        );
     }
 }
 
@@ -600,9 +646,7 @@ function normalizeReportData(input: unknown): ReportData {
         const value = output[key];
 
         if (Array.isArray(defaultValue)) {
-            output[key] = Array.isArray(value)
-                ? normalizeRows(value)
-                : [];
+            output[key] = Array.isArray(value) ? normalizeRows(value) : [];
             continue;
         }
 
@@ -827,7 +871,10 @@ function buildOpenAIFileData(file: InputFile): string {
     return `data:${file.mimeType};base64,${base64}`;
 }
 
-function buildOutputFileName(params: { company: string; year: string }): string {
+function buildOutputFileName(params: {
+    company: string;
+    year: string;
+}): string {
     const company =
         params.company && params.company !== "Dato no disponible"
             ? params.company
