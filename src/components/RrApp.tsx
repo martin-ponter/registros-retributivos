@@ -496,33 +496,6 @@ export default function RrApp() {
                                                         Abrir carpeta
                                                     </a>
                                                 )}
-
-                                                {status.iaReport?.url && (
-                                                    <a
-                                                        href={
-                                                            status.iaReport.url
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
-                                                    >
-                                                        Descargar IA
-                                                    </a>
-                                                )}
-
-                                                {status.finalReport?.url && (
-                                                    <a
-                                                        href={
-                                                            status.finalReport
-                                                                .url
-                                                        }
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
-                                                    >
-                                                        Descargar final
-                                                    </a>
-                                                )}
                                             </div>
                                         </div>
 
