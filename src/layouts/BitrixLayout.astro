@@ -1,0 +1,22 @@
+---
+import "../styles/global.css";
+
+type Props = {
+  title?: string;
+};
+
+const { title = "Registros Retributivos" } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <script src="//api.bitrix24.com/api/v1/"></script>
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
