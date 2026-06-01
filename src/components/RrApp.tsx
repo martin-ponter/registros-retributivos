@@ -307,7 +307,7 @@ export default function RrApp() {
                                                 void handleSearch();
                                             }
                                         }}
-                                        placeholder="Ej: 60392288S o ZORRILLA"
+                                        placeholder="Ej: CIF o NOMBRE DE LA EMPRESA"
                                         className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm outline-none ring-0 transition focus:border-gray-900"
                                     />
                                 </label>
