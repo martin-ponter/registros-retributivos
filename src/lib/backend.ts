@@ -12,8 +12,8 @@ export type RrStatus = {
     cif: string;
     year: number;
     folderUrl?: string | null;
-    bitrixCompanyFolderId?: string | null;
     bitrixYearFolderId?: string | null;
+    bitrixCompanyFolderId?: string | null;
     excelBiloop?: {
         exists: boolean;
         fileName?: string | null;
@@ -41,7 +41,12 @@ export type RrStatus = {
 };
 
 export type GenerateReportResponse = {
-    jobId: string;
+    ok?: boolean;
+    jobId?: string;
+    fileName?: string;
+    bitrixUpload?: unknown;
+    unresolvedTags?: string[];
+    error?: string;
 };
 
 function getApiBaseUrl(): string {
@@ -115,12 +120,34 @@ export async function getRrStatus(params: {
 }
 
 export async function generateIaReport(params: {
-    companyId: string;
+    bitrixExcelFileId: string;
+    bitrixFolderId: string;
+    outputFileName: string;
+    companyName: string;
+    cif?: string;
     year: number;
     requestedByBitrixUserId?: string;
 }): Promise<GenerateReportResponse> {
-    return apiFetch<GenerateReportResponse>("/api/rr/generate-ia-report", {
-        method: "POST",
-        body: JSON.stringify(params),
-    });
+    return apiFetch<GenerateReportResponse>(
+        "/api/generarInforme/generarInforme",
+        {
+            method: "POST",
+            body: JSON.stringify({
+                bitrixExcelFileId: params.bitrixExcelFileId,
+                bitrixFolderId: params.bitrixFolderId,
+                outputFileName: params.outputFileName,
+                contextText: [
+                    `Empresa seleccionada en Bitrix: ${params.companyName}`,
+                    `CIF/NIF: ${params.cif || "Dato no disponible"}`,
+                    `Año del registro retributivo: ${params.year}`,
+                    params.requestedByBitrixUserId
+                        ? `Usuario Bitrix solicitante: ${params.requestedByBitrixUserId}`
+                        : "",
+                    "El informe debe generarse usando como fuente principal el Excel de registro retributivo descargado desde Bitrix Drive.",
+                ]
+                    .filter(Boolean)
+                    .join("\n"),
+            }),
+        },
+    );
 }

@@ -34,6 +34,8 @@ export default function RrApp() {
     const canGenerateReport = Boolean(
         selectedCompany &&
         status?.excelBiloop?.exists &&
+        status.excelBiloop?.bitrixFileId &&
+        status.bitrixCompanyFolderId &&
         !status?.iaReport?.exists &&
         actionState !== "loading",
     );
@@ -68,6 +70,8 @@ export default function RrApp() {
             setSelectedCompany(null);
             setStatus(null);
             setSearchState("idle");
+            setStatusState("idle");
+            setActionState("idle");
             setErrorMessage(null);
             return;
         }
@@ -110,6 +114,8 @@ export default function RrApp() {
         setErrorMessage(null);
         setSelectedCompany(null);
         setStatus(null);
+        setStatusState("idle");
+        setActionState("idle");
         setSearchState("loading");
 
         try {
@@ -132,6 +138,7 @@ export default function RrApp() {
         setStatus(null);
         setErrorMessage(null);
         setStatusState("loading");
+        setActionState("idle");
 
         try {
             const result = await getRrStatus({
@@ -152,14 +159,37 @@ export default function RrApp() {
     }
 
     async function handleGenerateIaReport() {
-        if (!selectedCompany) return;
+        if (!selectedCompany || !status) return;
+
+        const bitrixExcelFileId = status.excelBiloop?.bitrixFileId;
+        const bitrixFolderId = status.bitrixCompanyFolderId;
+
+        if (!bitrixExcelFileId) {
+            setErrorMessage("No se ha encontrado el ID del Excel de Biloop.");
+            return;
+        }
+
+        if (!bitrixFolderId) {
+            setErrorMessage(
+                "No se ha encontrado la carpeta de empresa en Bitrix Drive.",
+            );
+            return;
+        }
 
         setErrorMessage(null);
         setActionState("loading");
 
         try {
             await generateIaReport({
-                companyId: selectedCompany.id,
+                bitrixExcelFileId,
+                bitrixFolderId,
+                outputFileName: buildIaReportFileName({
+                    companyName: status.companyName,
+                    cif: status.cif || selectedCompany.cif || "",
+                    year,
+                }),
+                companyName: status.companyName,
+                cif: status.cif || selectedCompany.cif,
                 year,
                 requestedByBitrixUserId: currentUser?.id,
             });
@@ -181,9 +211,29 @@ export default function RrApp() {
         }
     }
 
-    const statusMessage = status
-        ? (status as RrStatus & { message?: string }).message
-        : null;
+    function buildIaReportFileName(params: {
+        companyName: string;
+        cif: string;
+        year: number;
+    }): string {
+        const cifPart = sanitizeFileName(params.cif || "sin-cif");
+        const companyPart = sanitizeFileName(params.companyName || "empresa");
+
+        return `informe-ia-${params.year}-${cifPart}-${companyPart}.docx`;
+    }
+
+    function sanitizeFileName(value: string): string {
+        return value
+            .normalize("NFD")
+            .replace(/\p{Diacritic}/gu, "")
+            .replace(/[^a-zA-Z0-9._-]+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-|-$/g, "")
+            .slice(0, 120)
+            .toLowerCase();
+    }
+
+    const statusMessage = status?.message || null;
 
     return (
         <main className="min-h-screen bg-gray-100 p-4 md:p-6">
@@ -236,6 +286,8 @@ export default function RrApp() {
                                         setQuery(event.target.value);
                                         setSelectedCompany(null);
                                         setStatus(null);
+                                        setStatusState("idle");
+                                        setActionState("idle");
                                     }}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter") {
@@ -258,6 +310,8 @@ export default function RrApp() {
                                         setYear(Number(event.target.value));
                                         setSelectedCompany(null);
                                         setStatus(null);
+                                        setStatusState("idle");
+                                        setActionState("idle");
                                     }}
                                     className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-gray-900"
                                 >
@@ -478,6 +532,17 @@ export default function RrApp() {
                                             <p className="mt-3 text-sm text-gray-600">
                                                 Ya existe informe IA para esta
                                                 empresa y año.
+                                            </p>
+                                        )}
+
+                                    {status.excelBiloop?.exists &&
+                                        !status.iaReport?.exists &&
+                                        !canGenerateReport && (
+                                            <p className="mt-3 text-sm text-amber-700">
+                                                Existe el Excel, pero falta el
+                                                ID del archivo o de la carpeta.
+                                                Revisa la respuesta de
+                                                /api/rr/status.
                                             </p>
                                         )}
                                 </div>
