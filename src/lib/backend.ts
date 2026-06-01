@@ -12,26 +12,32 @@ export type RrStatus = {
     cif: string;
     year: number;
     folderUrl?: string | null;
+    bitrixCompanyFolderId?: string | null;
+    bitrixYearFolderId?: string | null;
     excelBiloop?: {
         exists: boolean;
         fileName?: string | null;
         url?: string | null;
+        bitrixFileId?: string | null;
     };
     iaReport?: {
         exists: boolean;
         fileName?: string | null;
         url?: string | null;
+        bitrixFileId?: string | null;
     };
     finalReport?: {
         exists: boolean;
         fileName?: string | null;
         url?: string | null;
+        bitrixFileId?: string | null;
     };
     currentJob?: {
         id: string;
         status: "queued" | "running" | "done" | "error";
         message?: string;
     } | null;
+    message?: string;
 };
 
 export type GenerateReportResponse = {
@@ -60,12 +66,30 @@ async function apiFetch<T>(
         },
     });
 
+    const contentType = response.headers.get("content-type") || "";
+
     if (!response.ok) {
-        const text = await response.text();
-        throw new Error(text || `Error HTTP ${response.status}`);
+        if (contentType.includes("application/json")) {
+            const data = (await response.json().catch(() => null)) as {
+                error?: string;
+                message?: string;
+            } | null;
+
+            throw new Error(
+                data?.error ||
+                    data?.message ||
+                    `Error HTTP ${response.status} en ${path}`,
+            );
+        }
+
+        throw new Error(`Error HTTP ${response.status} en ${path}`);
     }
 
-    return response.json() as Promise<T>;
+    if (contentType.includes("application/json")) {
+        return response.json() as Promise<T>;
+    }
+
+    throw new Error(`La ruta ${path} no ha devuelto JSON.`);
 }
 
 export async function searchCompanies(

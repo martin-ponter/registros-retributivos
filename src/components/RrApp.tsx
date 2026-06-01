@@ -30,6 +30,7 @@ export default function RrApp() {
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     const canSearch = query.trim().length >= 2;
+
     const canGenerateReport = Boolean(
         selectedCompany &&
         status?.excelBiloop?.exists &&
@@ -59,6 +60,50 @@ export default function RrApp() {
         };
     }, []);
 
+    useEffect(() => {
+        const trimmedQuery = query.trim();
+
+        if (trimmedQuery.length < 2) {
+            setCompanies([]);
+            setSelectedCompany(null);
+            setStatus(null);
+            setSearchState("idle");
+            setErrorMessage(null);
+            return;
+        }
+
+        let cancelled = false;
+
+        const timeoutId = window.setTimeout(async () => {
+            setErrorMessage(null);
+            setSearchState("loading");
+
+            try {
+                const result = await searchCompanies(trimmedQuery);
+
+                if (cancelled) return;
+
+                setCompanies(result);
+                setSearchState("success");
+            } catch (error) {
+                if (cancelled) return;
+
+                setCompanies([]);
+                setSearchState("error");
+                setErrorMessage(
+                    error instanceof Error
+                        ? error.message
+                        : "Error buscando empresas.",
+                );
+            }
+        }, 350);
+
+        return () => {
+            cancelled = true;
+            window.clearTimeout(timeoutId);
+        };
+    }, [query]);
+
     async function handleSearch() {
         if (!canSearch) return;
 
@@ -72,6 +117,7 @@ export default function RrApp() {
             setCompanies(result);
             setSearchState("success");
         } catch (error) {
+            setCompanies([]);
             setSearchState("error");
             setErrorMessage(
                 error instanceof Error
@@ -135,6 +181,10 @@ export default function RrApp() {
         }
     }
 
+    const statusMessage = status
+        ? (status as RrStatus & { message?: string }).message
+        : null;
+
     return (
         <main className="min-h-screen bg-gray-100 p-4 md:p-6">
             <section className="mx-auto max-w-6xl space-y-5">
@@ -144,9 +194,11 @@ export default function RrApp() {
                             <p className="text-sm font-medium text-gray-500">
                                 Ponter · Laboral
                             </p>
+
                             <h1 className="mt-1 text-2xl font-bold text-gray-950">
                                 Registros Retributivos
                             </h1>
+
                             <p className="mt-2 max-w-3xl text-sm text-gray-600">
                                 Busca una empresa por nombre o CIF, comprueba si
                                 existe su Excel de Biloop en Bitrix Drive y
@@ -177,17 +229,20 @@ export default function RrApp() {
                                 <span className="text-sm font-medium text-gray-700">
                                     Nombre o CIF
                                 </span>
+
                                 <input
                                     value={query}
-                                    onChange={(event) =>
-                                        setQuery(event.target.value)
-                                    }
+                                    onChange={(event) => {
+                                        setQuery(event.target.value);
+                                        setSelectedCompany(null);
+                                        setStatus(null);
+                                    }}
                                     onKeyDown={(event) => {
                                         if (event.key === "Enter") {
                                             void handleSearch();
                                         }
                                     }}
-                                    placeholder="Ej: B12345678 o Empresa S.L."
+                                    placeholder="Ej: 60392288S o ZORRILLA"
                                     className="mt-1 w-full rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm outline-none ring-0 transition focus:border-gray-900"
                                 />
                             </label>
@@ -196,6 +251,7 @@ export default function RrApp() {
                                 <span className="text-sm font-medium text-gray-700">
                                     Año
                                 </span>
+
                                 <select
                                     value={year}
                                     onChange={(event) => {
@@ -220,12 +276,27 @@ export default function RrApp() {
                             >
                                 {searchState === "loading"
                                     ? "Buscando..."
-                                    : "Buscar"}
+                                    : "Buscar ahora"}
                             </button>
                         </div>
 
                         <div className="mt-5 space-y-2">
-                            {companies.length === 0 &&
+                            {query.trim().length < 2 && (
+                                <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+                                    Escribe al menos 2 caracteres para buscar
+                                    por nombre o CIF.
+                                </p>
+                            )}
+
+                            {query.trim().length >= 2 &&
+                                searchState === "loading" && (
+                                    <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
+                                        Buscando coincidencias...
+                                    </p>
+                                )}
+
+                            {query.trim().length >= 2 &&
+                                companies.length === 0 &&
                                 searchState === "success" && (
                                     <p className="rounded-xl bg-gray-50 p-3 text-sm text-gray-600">
                                         No se han encontrado empresas.
@@ -252,6 +323,7 @@ export default function RrApp() {
                                         <div className="font-semibold">
                                             {company.title}
                                         </div>
+
                                         <div
                                             className={
                                                 selected
@@ -291,13 +363,24 @@ export default function RrApp() {
                                     <div className="text-sm text-gray-500">
                                         Empresa seleccionada
                                     </div>
+
                                     <div className="mt-1 text-lg font-bold text-gray-950">
                                         {status.companyName}
                                     </div>
+
                                     <div className="text-sm text-gray-600">
-                                        CIF: {status.cif || "No informado"} ·
-                                        Año: {status.year}
+                                        CIF:{" "}
+                                        {status.cif ||
+                                            selectedCompany.cif ||
+                                            "No informado"}{" "}
+                                        · Año: {status.year}
                                     </div>
+
+                                    {statusMessage && (
+                                        <p className="mt-3 text-sm text-amber-700">
+                                            {statusMessage}
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="grid gap-3 md:grid-cols-3">
@@ -385,8 +468,8 @@ export default function RrApp() {
                                     {!status.excelBiloop?.exists && (
                                         <p className="mt-3 text-sm text-amber-700">
                                             No aparece el Excel de Biloop en
-                                            Drive. Primero habrá que descargarlo
-                                            o revisar la carpeta de la empresa.
+                                            Drive. Primero habrá que revisar la
+                                            carpeta de la empresa.
                                         </p>
                                     )}
 
@@ -417,6 +500,7 @@ function StatusCard(props: {
         <div className="rounded-2xl border border-gray-200 p-4">
             <div className="flex items-center justify-between gap-3">
                 <h3 className="font-semibold text-gray-950">{props.title}</h3>
+
                 <span
                     className={`rounded-full px-3 py-1 text-xs font-semibold ${
                         props.exists
