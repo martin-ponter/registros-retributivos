@@ -46,6 +46,7 @@ export default function RrApp() {
         if (insideBitrix === null) return "Inicializando Bitrix...";
         if (!insideBitrix) return "Modo desarrollo fuera de Bitrix";
         if (!currentUser) return "Usuario Bitrix no detectado";
+
         return `${currentUser.name}${currentUser.email ? ` · ${currentUser.email}` : ""}`;
     }, [insideBitrix, currentUser]);
 
@@ -410,7 +411,7 @@ export default function RrApp() {
                             {!selectedCompany && (
                                 <div className="mt-3 flex flex-1 items-center justify-center rounded-2xl bg-gray-50 p-6 text-center text-sm text-gray-600">
                                     Selecciona una empresa para ver si ya tiene
-                                    Excel de Biloop e informe generado.
+                                    Excel de Biloop e informe IA.
                                 </div>
                             )}
 
@@ -446,7 +447,7 @@ export default function RrApp() {
                                         )}
                                     </div>
 
-                                    <div className="grid gap-2 md:grid-cols-3">
+                                    <div className="grid gap-2 md:grid-cols-2">
                                         <StatusCard
                                             title="Excel Biloop"
                                             exists={Boolean(
@@ -466,17 +467,6 @@ export default function RrApp() {
                                             url={status.iaReport?.url}
                                             fileName={status.iaReport?.fileName}
                                         />
-
-                                        <StatusCard
-                                            title="Informe final"
-                                            exists={Boolean(
-                                                status.finalReport?.exists,
-                                            )}
-                                            url={status.finalReport?.url}
-                                            fileName={
-                                                status.finalReport?.fileName
-                                            }
-                                        />
                                     </div>
 
                                     <div className="min-h-0 rounded-2xl border border-gray-200 p-3">
@@ -494,6 +484,33 @@ export default function RrApp() {
                                                         className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
                                                     >
                                                         Abrir carpeta
+                                                    </a>
+                                                )}
+
+                                                {status.excelBiloop?.url && (
+                                                    <a
+                                                        href={
+                                                            status.excelBiloop
+                                                                .url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
+                                                    >
+                                                        Abrir Excel
+                                                    </a>
+                                                )}
+
+                                                {status.iaReport?.url && (
+                                                    <a
+                                                        href={
+                                                            status.iaReport.url
+                                                        }
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="rounded-xl border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-900 transition hover:bg-gray-50 md:text-sm"
+                                                    >
+                                                        Descargar informe IA
                                                     </a>
                                                 )}
                                             </div>
@@ -544,6 +561,14 @@ export default function RrApp() {
                                                     de /api/rr/status.
                                                 </p>
                                             )}
+
+                                        {isGenerating && (
+                                            <p className="mt-2 text-xs text-blue-700 md:text-sm">
+                                                El informe se está generando. No
+                                                cierres esta ventana ni pulses
+                                                el botón de nuevo.
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                             )}
