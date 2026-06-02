@@ -15,6 +15,27 @@ type CompanySearchResult = {
     cif?: string;
 };
 
+const BLOCKED_COMPANIES = [
+    {
+        cif: "B75955815",
+        title: "PONTER ASESORES LA MANCHA S,.L",
+    },
+    {
+        cif: "B85711778",
+        title: "IBERIS LEX SERVICIOS EMPRESARIALES, S.L",
+    },
+    {
+        cif: "B78120193",
+        title: "STAFF DE TECNICAS CONTABLES SL",
+    },
+    {
+        title: "PONTER ABOGADOS",
+    },
+].map((company) => ({
+    cif: company.cif ? compactIdentifier(company.cif) : "",
+    title: compactIdentifier(company.title),
+}));
+
 const BITRIX_WEBHOOK_URL = process.env.BITRIX_WEBHOOK_URL?.replace(/\/$/, "");
 const CIF_FIELD = process.env.BITRIX_COMPANY_CIF_FIELD || "";
 
@@ -24,6 +45,10 @@ export const GET: APIRoute = async ({ request }) => {
         const query = url.searchParams.get("query")?.trim() || "";
 
         if (query.length < 2) {
+            return json([]);
+        }
+
+        if (isBlockedCompanyQuery(query)) {
             return json([]);
         }
 
@@ -42,6 +67,7 @@ export const GET: APIRoute = async ({ request }) => {
 
         for (const company of byName) {
             const normalized = normalizeCompany(company);
+            if (isBlockedCompany(normalized)) continue;
             results.set(normalized.id, normalized);
         }
 
@@ -50,6 +76,7 @@ export const GET: APIRoute = async ({ request }) => {
 
             for (const company of byCif) {
                 const normalized = normalizeCompany(company);
+                if (isBlockedCompany(normalized)) continue;
                 results.set(normalized.id, normalized);
             }
         }
@@ -125,6 +152,30 @@ function normalizeCompany(company: BitrixCompany): CompanySearchResult {
     };
 }
 
+function isBlockedCompanyQuery(query: string): boolean {
+    const compactQuery = compactIdentifier(query);
+    if (!compactQuery) return false;
+
+    return BLOCKED_COMPANIES.some(
+        (blocked) =>
+            compactQuery === blocked.cif ||
+            compactQuery === blocked.title ||
+            compactQuery.includes(blocked.title),
+    );
+}
+
+function isBlockedCompany(company: CompanySearchResult): boolean {
+    const compactTitle = compactIdentifier(company.title);
+    const compactCif = company.cif ? compactIdentifier(company.cif) : "";
+
+    return BLOCKED_COMPANIES.some(
+        (blocked) =>
+            compactCif === blocked.cif ||
+            compactTitle === blocked.title ||
+            compactTitle.includes(blocked.title),
+    );
+}
+
 async function callBitrix(
     method: string,
     params: Record<string, unknown>,
@@ -159,6 +210,14 @@ async function callBitrix(
 function stringValue(value: unknown): string {
     if (value === null || value === undefined) return "";
     return String(value).trim();
+}
+
+function compactIdentifier(value: string): string {
+    return value
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-zA-Z0-9]/g, "")
+        .toUpperCase();
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
