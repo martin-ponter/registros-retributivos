@@ -29,6 +29,7 @@ const BLOCKED_COMPANIES = [
         title: "STAFF DE TECNICAS CONTABLES SL",
     },
     {
+        cif: "B45732211",
         title: "PONTER ABOGADOS",
     },
 ].map((company) => ({
